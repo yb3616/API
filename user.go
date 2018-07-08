@@ -50,16 +50,6 @@ func addUser(db *gorm.DB, e *casbin.Enforcer, isAdmin bool) func(*gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"error": err})
 			return
 		}
-		//  ur := UserRole{
-		//      UserId: user.ID,
-		//      RoleId: roleid,
-		//  }
-		//  if err := addRole(&ur, tx); err != nil {
-		//      fmt.Println("error: addRole")
-		//      tx.Rollback()
-		//      c.JSON(http.StatusOK, gin.H{"error": err})
-		//      return
-		//  }
 		var gid string
 		if isAdmin {
 			gid = "r1"
@@ -208,13 +198,43 @@ func getUserInfo(db *gorm.DB, e *casbin.Enforcer) func(*gin.Context) {
 		var result Result
 		session := sessions.Default(c)
 		uid := session.Get("uid").(uint)
-		// DEBUG
-		//  fmt.Println("uid: ", uid)
-		db.Table("users").Select("users.id, users.user_name, users.nick_name, emails.email_address, phones.phone_number").Where("users.id = ?", uid).Joins("left join emails on emails.user_id = users.id").Joins("left join phones on phones.user_id = users.id").First(&result)
+		if err := db.Table("users").Select("users.id, users.user_name, users.nick_name, emails.email_address, phones.phone_number").Where("users.id = ?", uid).Joins("left join emails on emails.user_id = users.id").Joins("left join phones on phones.user_id = users.id").First(&result).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"err": err.Error()})
+			return
+		}
 		result.Roles = e.GetRolesForUser(fmt.Sprintf("u%d", uid))
 		c.JSON(http.StatusOK, gin.H{
 			"msg":    "success",
 			"result": result,
+		})
+	}
+}
+
+func getUsers(db *gorm.DB) func(*gin.Context) {
+	type User struct {
+		ID       uint
+		UserName string
+	}
+	return func(c *gin.Context) {
+		var page Pager
+		if err := c.BindQuery(&page); err != nil {
+			c.JSON(http.StatusOK, gin.H{"error": err.Error()})
+			return
+		}
+
+		if page.Lines < 0 {
+			page.Start = -1
+		}
+
+		var users []User
+		if err := db.Offset(page.Start - 1).Limit(page.Lines).Find(&users).Error; err != nil {
+			c.JSON(http.StatusOK, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"msg":  "success",
+			"data": users,
 		})
 	}
 }

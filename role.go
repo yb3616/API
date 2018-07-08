@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 	"net/http"
@@ -40,16 +41,30 @@ func addRole(db *gorm.DB, role *Role) error {
 
 func getRoles(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
+		var page Pager
+		if err := c.BindQuery(&page); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
 		var roles []Role
-		if err := db.Table("roles").Find(&roles).Error; err != nil {
-			c.JSON(http.StatusOK, gin.H{
-				"err": err,
-			})
+		if page.Lines < 0 {
+			page.Start = -1
+		}
+		fmt.Println(page)
+		if err := db.Debug().Table("roles").Offset(page.Start - 1).Limit(page.Lines).Find(&roles).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"err": err})
+			return
+		}
+		var total int
+		if err := db.Table("roles").Count(&total).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"err": err})
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{
 			"msg":   "success",
 			"roles": roles,
+			"total": total,
 		})
 	}
 }

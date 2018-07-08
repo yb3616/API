@@ -25,15 +25,13 @@ type Role struct {
 //}
 
 type Phone struct {
-	gorm.Model
 	PhoneNumber string `gorm:"unique_index"`
-	UserId      uint
+	UserId      uint   `gorm:"unique_index"`
 }
 
 type Email struct {
-	gorm.Model
 	EmailAddress string `gorm:"unique_index"`
-	UserId       uint
+	UserId       uint   `gorm:"unique_index"`
 }
 
 func initDB() *gorm.DB {
